@@ -13,6 +13,8 @@ from langchain_core.prompts import ChatPromptTemplate
 # LangChain tools for Gemini (Embeddings and the LLM itself)
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
+from operator import itemgetter
+
 # part-1: Load environment variables
 load_dotenv()
 os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
@@ -58,13 +60,10 @@ else:
 
 # Set up the strict instructions for the LLM
 template = """
-You are a helpful assistant that answers questions about a YouTube video.
-Use ONLY the following pieces of retrieved transcript to answer the question. 
-If the answer is not in the transcript, just say that you don't know.
-
-Transcript Context: {context}
-
-User Question: {question}
+Answer the question based on the context below.
+Context: {context}
+Chat History: {chat_history}
+Question: {question}
 """
 prompt = ChatPromptTemplate.from_template(template)
 
@@ -77,11 +76,19 @@ def format_docs(docs):
 
 # Assemble the RAG chain
 rag_chain = (
-    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    {
+        "context": itemgetter("question") | retriever | format_docs, 
+        "question": itemgetter("question"),
+        "chat_history": itemgetter("chat_history"),
+        # We need to route the chat history here too!
+    }
     | prompt
     | llm
     | StrOutputParser()
 )
+
+chat_history = []
+
 # Phase 3: Interactive Chat Loop
 
 print("\n🤖 Chat with the video! (Type 'quit' to exit)")
@@ -93,6 +100,13 @@ while True:
         print("Goodbye! 👋")
         break  # This immediately stops the while loop
 
-    response = rag_chain.invoke(query)
-    print("\nAnswer:")
-    print(response)
+    result = rag_chain.invoke({"question": query, "chat_history": chat_history})
+
+    ai_answer = result
+    # response = rag_chain.invoke(query)
+
+    print(f"AI: {ai_answer}") 
+
+    # Package the turn as a tuple and append it to the memory log
+    history_tuple = (query, ai_answer)
+    chat_history.append(history_tuple)
