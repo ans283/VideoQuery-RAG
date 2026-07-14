@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 # from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
-
+from langchain_community.chat_message_histories import SQLChatMessageHistory
 # LangChain tools for Gemini (Embeddings and the LLM itself)
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
@@ -87,8 +87,14 @@ rag_chain = (
     | StrOutputParser()
 )
 
-chat_history = []
+# Create a dynamic variable for the session
+current_session_id = "session_1"
 
+# Initialize the LangChain SQLite memory tool
+chat_memory = SQLChatMessageHistory(
+    session_id=current_session_id,
+    connection="sqlite:///chat_memory.db"
+)
 # Phase 3: Interactive Chat Loop
 
 print("\n🤖 Chat with the video! (Type 'quit' to exit)")
@@ -100,6 +106,9 @@ while True:
         print("Goodbye! 👋")
         break  # This immediately stops the while loop
 
+    # Retrieve the chat history from the memory
+    chat_history = chat_memory.messages
+
     result = rag_chain.invoke({"question": query, "chat_history": chat_history})
 
     ai_answer = result
@@ -109,4 +118,5 @@ while True:
 
     # Package the turn as a tuple and append it to the memory log
     history_tuple = (query, ai_answer)
-    chat_history.append(history_tuple)
+    chat_memory.add_user_message(query)
+    chat_memory.add_ai_message(ai_answer)
