@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import uuid
 
 # LangChain tools for loading, splitting, and storing
 from langchain_chroma import Chroma
@@ -7,8 +8,8 @@ from langchain_community.document_loaders import YoutubeLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 # from langchain_community.vectorstores import Chroma
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 # LangChain tools for Gemini (Embeddings and the LLM itself)
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -88,7 +89,8 @@ rag_chain = (
 )
 
 # Create a dynamic variable for the session
-current_session_id = "session_1"
+current_session_id = f"session_{str(uuid.uuid4())}"
+
 
 # Initialize the LangChain SQLite memory tool
 chat_memory = SQLChatMessageHistory(
@@ -102,12 +104,17 @@ print("\n🤖 Chat with the video! (Type 'quit' to exit)")
 while True:
     query = input("\nYour question: ")
     
-    if query.lower() == "quit":
-        print("Goodbye! 👋")
-        break  # This immediately stops the while loop
+    if query.lower() == "clear":
+        chat_memory.clear()
+        print("Chat history cleared.")
+        continue
 
+    if query.lower() in ["exit", "quit"]:
+        break
     # Retrieve the chat history from the memory
     chat_history = chat_memory.messages
+
+    print("Current memory:", chat_memory.messages)
 
     result = rag_chain.invoke({"question": query, "chat_history": chat_history})
 
